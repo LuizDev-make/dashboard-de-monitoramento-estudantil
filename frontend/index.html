@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard do Sistema de Monitoramento Estatístico de Estudantes da UFRPE. Dados sintéticos para fins educacionais.">
+    <title>Dashboard — Monitoramento UFRPE</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/componentes.css">
+    <link rel="icon" type="image/png" href="/educacao.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h1>📊 MonitorUFRPE</h1>
+                <div class="subtitle">Monitoramento Acadêmico</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item active">
+                    <span class="nav-icon">📈</span> Dashboard
+                </a>
+                <a href="/estudantes.html" class="nav-item">
+                    <span class="nav-icon">👥</span> Estudantes
+                </a>
+            </nav>
+            <div class="synthetic-notice">
+                ⚠️ Todos os dados exibidos são <strong>sintéticos</strong> (fictícios),
+                gerados para fins educacionais. Nenhum dado real de estudante é utilizado.
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main-content">
+            <header class="page-header">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2>Dashboard Geral</h2>
+                        <div class="breadcrumb">Visão geral do desempenho acadêmico</div>
+                    </div>
+                    <div class="flex gap-sm">
+                        <button class="btn btn-secondary btn-sm" onclick="carregarDados()">🔄 Atualizar</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Loading -->
+                <div id="loading-overlay" class="loading-overlay hidden">
+                    <div class="spinner"></div> Carregando dados...
+                </div>
+
+                <!-- Filtros -->
+                <div class="filters-bar">
+                    <div class="filter-group">
+                        <label>Curso</label>
+                        <select id="filtro-curso" class="select select-sm" onchange="aplicarFiltros()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Ano</label>
+                        <select id="filtro-ano" class="select select-sm" onchange="aplicarFiltros()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Semestre</label>
+                        <select id="filtro-semestre" class="select select-sm" onchange="aplicarFiltros()">
+                            <option value="">Todos</option>
+                            <option value="1">1º Semestre</option>
+                            <option value="2">2º Semestre</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="limparFiltros()">✕ Limpar</button>
+                </div>
+
+                <!-- Cards de resumo -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value" id="total-estudantes">—</div>
+                        <div class="stat-label">Total de Estudantes</div>
+                    </div>
+                    <div class="stat-card card-ok">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-value" id="total-ok">—</div>
+                        <div class="stat-label">OK (<span id="pct-ok">—</span>)</div>
+                    </div>
+                    <div class="stat-card card-atencao">
+                        <div class="stat-icon">⚠️</div>
+                        <div class="stat-value" id="total-atencao">—</div>
+                        <div class="stat-label">Atenção (<span id="pct-atencao">—</span>)</div>
+                    </div>
+                    <div class="stat-card card-perigo">
+                        <div class="stat-icon">🚨</div>
+                        <div class="stat-value" id="total-perigo">—</div>
+                        <div class="stat-label">Perigo (<span id="pct-perigo">—</span>)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value" id="media-global">—</div>
+                        <div class="stat-label">Média Global</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📉</div>
+                        <div class="stat-value" id="mediana-global">—</div>
+                        <div class="stat-label">Mediana</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-value" id="freq-media">—</div>
+                        <div class="stat-label">Frequência Média</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-value" id="taxa-reprovacao">—</div>
+                        <div class="stat-label">Taxa Média de Reprovação</div>
+                    </div>
+                </div>
+
+                <!-- Cards secundários -->
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                    <div class="stat-card">
+                        <div class="stat-value" id="sem-contato" style="font-size:1.4rem;">—</div>
+                        <div class="stat-label">Sem Contato</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="acomp-atrasados" style="font-size:1.4rem;">—</div>
+                        <div class="stat-label">Acomp. Atrasados</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="curso-perigo" style="font-size:0.9rem;">—</div>
+                        <div class="stat-label">Curso Maior % Perigo</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="periodo-risco" style="font-size:1.4rem;">—</div>
+                        <div class="stat-label">Período Maior Risco</div>
+                    </div>
+                </div>
+
+                <!-- Gráficos -->
+                <div class="charts-grid">
+                    <!-- Distribuição de classificações -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Distribuição de Classificações</div>
+                                <div class="chart-subtitle">OK / Atenção / Perigo</div>
+                            </div>
+                        </div>
+                        <div class="chart-canvas-wrapper">
+                            <canvas id="chart-classificacao"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Histograma -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Histograma</div>
+                                <div class="chart-subtitle" id="histograma-info">Selecione um indicador</div>
+                            </div>
+                            <select id="histograma-indicador" class="select select-sm" onchange="carregarHistograma()" style="width:auto;">
+                                <option value="media_global">Média Global</option>
+                                <option value="media_semestre">Média Semestre</option>
+                                <option value="frequencia_media">Frequência</option>
+                                <option value="probabilidade_risco">Probabilidade de Risco</option>
+                                <option value="percentual_integralizacao">% Integralização</option>
+                            </select>
+                        </div>
+                        <div class="chart-canvas-wrapper">
+                            <canvas id="chart-histograma"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Evolução temporal -->
+                <div class="chart-container" style="margin-bottom: var(--space-xl);">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Evolução Temporal</div>
+                            <div class="chart-subtitle">Média por semestre letivo</div>
+                        </div>
+                        <select id="evolucao-indicador" class="select select-sm" onchange="carregarEvolucao()" style="width:auto;">
+                            <option value="media_global">Média Global</option>
+                            <option value="frequencia_media">Frequência</option>
+                            <option value="probabilidade_risco">Prob. de Risco</option>
+                            <option value="reprovacoes">Reprovações</option>
+                        </select>
+                    </div>
+                    <div class="chart-canvas-wrapper" style="height:250px;">
+                        <canvas id="chart-evolucao"></canvas>
+                    </div>
+                </div>
+
+                <!-- Estudantes prioritários -->
+                <div class="priority-section">
+                    <div class="section-title">🚨 Estudantes Prioritários</div>
+                    <div class="priority-cards" id="prioritarios-lista">
+                        <div class="loading-overlay"><div class="spinner"></div> Carregando...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/graficos.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="/js/formularios.js"></script>
+</body>
+</html>

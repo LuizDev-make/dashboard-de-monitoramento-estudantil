@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Lista de estudantes do Sistema de Monitoramento UFRPE. Busca, filtros, ordenação e exportação.">
+    <title>Estudantes — Monitoramento UFRPE</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/componentes.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h1>📊 MonitorUFRPE</h1>
+                <div class="subtitle">Monitoramento Acadêmico</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">
+                    <span class="nav-icon">📈</span> Dashboard
+                </a>
+                <a href="/estudantes.html" class="nav-item active">
+                    <span class="nav-icon">👥</span> Estudantes
+                </a>
+            </nav>
+            <div class="synthetic-notice">
+                ⚠️ Dados <strong>sintéticos</strong> (fictícios) para fins educacionais.
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main-content">
+            <header class="page-header">
+                <h2>Lista de Estudantes</h2>
+                <div class="breadcrumb">Dashboard › Estudantes</div>
+            </header>
+
+            <div class="content-area">
+                <div class="table-wrapper">
+                    <!-- Toolbar -->
+                    <div class="table-toolbar">
+                        <div class="toolbar-left">
+                            <div class="search-input">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" id="busca-estudante" class="input input-sm" 
+                                       placeholder="Buscar por nome ou matrícula..." 
+                                       oninput="buscarDebounced()" style="width:250px; padding-left:32px;">
+                            </div>
+                            <select id="filtro-curso-est" class="select select-sm" onchange="aplicarFiltrosEstudantes()" style="width:auto;">
+                                <option value="">Todos os cursos</option>
+                            </select>
+                            <select id="filtro-risco" class="select select-sm" onchange="aplicarFiltrosEstudantes()" style="width:auto;">
+                                <option value="">Todas classificações</option>
+                                <option value="OK">✅ OK</option>
+                                <option value="Atenção">⚠️ Atenção</option>
+                                <option value="Perigo">🚨 Perigo</option>
+                            </select>
+                            <button class="btn btn-ghost btn-sm" onclick="limparFiltrosEstudantes()">✕ Limpar</button>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-secondary btn-sm" onclick="exportarDados()">📥 Exportar CSV</button>
+                            <button class="btn btn-secondary btn-sm" onclick="carregarEstudantes()">🔄 Atualizar</button>
+                        </div>
+                    </div>
+
+                    <!-- Tabela -->
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:30px"></th>
+                                    <th data-sort="classificacao_risco" onclick="ordenarPor('classificacao_risco')">
+                                        Classif. <span class="sort-icon"></span>
+                                    </th>
+                                    <th data-sort="probabilidade_risco" onclick="ordenarPor('probabilidade_risco')">
+                                        Probabilidade <span class="sort-icon">▼</span>
+                                    </th>
+                                    <th data-sort="matricula" onclick="ordenarPor('matricula')">
+                                        Matrícula <span class="sort-icon"></span>
+                                    </th>
+                                    <th data-sort="nome" onclick="ordenarPor('nome')">
+                                        Nome <span class="sort-icon"></span>
+                                    </th>
+                                    <th>Telefone</th>
+                                    <th>Curso</th>
+                                    <th>Período</th>
+                                    <th data-sort="media_global" onclick="ordenarPor('media_global')">
+                                        Média G. <span class="sort-icon"></span>
+                                    </th>
+                                    <th data-sort="media_semestre" onclick="ordenarPor('media_semestre')">
+                                        Média S. <span class="sort-icon"></span>
+                                    </th>
+                                    <th data-sort="frequencia_media" onclick="ordenarPor('frequencia_media')">
+                                        Freq. <span class="sort-icon"></span>
+                                    </th>
+                                    <th data-sort="reprovacoes" onclick="ordenarPor('reprovacoes')">
+                                        Reprov. <span class="sort-icon"></span>
+                                    </th>
+                                    <th>Rep. Suc.</th>
+                                    <th data-sort="percentual_integralizacao" onclick="ordenarPor('percentual_integralizacao')">
+                                        Integr. <span class="sort-icon"></span>
+                                    </th>
+                                    <th data-sort="distancia_km" onclick="ordenarPor('distancia_km')">
+                                        Dist. <span class="sort-icon"></span>
+                                    </th>
+                                    <th>Atendimento</th>
+                                    <th>Responsável</th>
+                                    <th>Último Contato</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-estudantes-body">
+                                <tr><td colspan="18" class="loading-overlay"><div class="spinner"></div> Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginação -->
+                    <div class="pagination" id="paginacao"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/estudantes.js"></script>
+</body>
+</html>

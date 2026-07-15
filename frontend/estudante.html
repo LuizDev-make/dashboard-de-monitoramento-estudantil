@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Perfil detalhado do estudante — Sistema de Monitoramento UFRPE.">
+    <title>Perfil do Estudante — Monitoramento UFRPE</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/componentes.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <h1>📊 MonitorUFRPE</h1>
+                <div class="subtitle">Monitoramento Acadêmico</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item"><span class="nav-icon">📈</span> Dashboard</a>
+                <a href="/estudantes.html" class="nav-item"><span class="nav-icon">👥</span> Estudantes</a>
+            </nav>
+            <div class="synthetic-notice">
+                ⚠️ Dados <strong>sintéticos</strong> para fins educacionais.
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main-content">
+            <header class="page-header">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 id="titulo-estudante">Perfil do Estudante</h2>
+                        <div class="breadcrumb">Dashboard › Estudantes › <span id="breadcrumb-nome">...</span></div>
+                    </div>
+                    <div class="flex gap-sm">
+                        <a href="/estudantes.html" class="btn btn-secondary btn-sm">← Voltar</a>
+                        <button class="btn btn-primary btn-sm" onclick="abrirModalAcompanhamento(estudanteAtual)">📝 Editar Acompanhamento</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-area" id="perfil-conteudo">
+                <div class="loading-overlay"><div class="spinner"></div> Carregando perfil...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Acompanhamento -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Editar Acompanhamento</h3>
+                <button class="modal-close" onclick="fecharModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-md">
+                    <label>Funcionário Responsável</label>
+                    <input type="text" id="form-responsavel" class="input" placeholder="Nome do responsável">
+                </div>
+                <div class="input-group mb-md">
+                    <label>Situação do Atendimento</label>
+                    <select id="form-situacao" class="select">
+                        <option value="pendente">Pendente</option>
+                        <option value="em_andamento">Em Andamento</option>
+                        <option value="concluido">Concluído</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <div class="input-group mb-md">
+                    <label>Prioridade (0-10)</label>
+                    <input type="number" id="form-prioridade" class="input" min="0" max="10" value="0">
+                </div>
+                <div class="input-group mb-md">
+                    <label>Observação</label>
+                    <textarea id="form-observacao" class="input" rows="3" placeholder="Observações sobre o estudante..."></textarea>
+                </div>
+                <div class="input-group mb-md">
+                    <label>Encaminhamento</label>
+                    <input type="text" id="form-encaminhamento" class="input" placeholder="Ex: Coordenação, Psicólogo...">
+                </div>
+                <div class="input-group mb-md">
+                    <label>Data Prevista para Contato</label>
+                    <input type="date" id="form-data-contato" class="input">
+                </div>
+                <div class="input-group mb-md">
+                    <label>Ação Realizada</label>
+                    <textarea id="form-acao" class="input" rows="2" placeholder="Descreva a ação realizada..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="salvarAcompanhamento()">💾 Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/graficos.js"></script>
+    <script src="/js/formularios.js"></script>
+    <script>
+        let estudanteAtual = null;
+
+        async function carregarPerfil() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            if (!id) {
+                document.getElementById('perfil-conteudo').innerHTML = '<p class="text-muted">ID do estudante não informado.</p>';
+                return;
+            }
+            estudanteAtual = id;
+
+            try {
+                const [detalhe, historicoData] = await Promise.all([
+                    apiGet(`/estudantes/${id}`),
+                    apiGet(`/estudantes/${id}/historico`),
+                ]);
+
+                const est = detalhe.estudante;
+                const ult = detalhe.ultimo_acompanhamento;
+                const classif = detalhe.classificacao;
+                const alertas = detalhe.fatores_alerta || [];
+                const historico = historicoData.historico || [];
+                const evolucao = historicoData.evolucao || {};
+                const disciplinas = historicoData.disciplinas_atual || [];
+
+                document.getElementById('titulo-estudante').textContent = est.nome;
+                document.getElementById('breadcrumb-nome').textContent = est.nome;
+
+                const riskClass = classif ? classeRisco(classif.classificacao) : 'neutro';
+                const probText = classif ? `${classif.probabilidade_percentual}%` : '—';
+
+                let html = '';
+
+                // Card de classificação
+                html += `
+                <div class="section-card" style="border-left: 4px solid var(--color-${riskClass === 'neutro' ? 'ok' : riskClass})">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="badge badge-${riskClass}" style="font-size: 1rem; padding: 6px 16px;">
+                                <span class="risk-dot ${riskClass}"></span>
+                                ${probText} ${classif ? classif.classificacao : 'Sem dados'}
+                            </span>
+                            <p class="text-secondary mt-sm" style="font-size: 0.8rem;">
+                                Probabilidade estimada de desfecho de risco: <strong>${probText}</strong>.
+                                O resultado deve ser analisado por um funcionário responsável.
+                            </p>
+                        </div>
+                    </div>
+                </div>`;
+
+                // Dados pessoais
+                html += `
+                <div class="section-card">
+                    <div class="section-title">👤 Dados do Estudante</div>
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">Matrícula</span><span class="info-value font-mono">${est.matricula}</span></div>
+                        <div class="info-item"><span class="info-label">Nome</span><span class="info-value">${est.nome}</span></div>
+                        <div class="info-item"><span class="info-label">Telefone</span><span class="info-value">${est.telefone || '—'}</span></div>
+                        <div class="info-item"><span class="info-label">Sexo</span><span class="info-value">${est.sexo || '—'}</span></div>
+                        <div class="info-item"><span class="info-label">Curso</span><span class="info-value">${est.curso_nome || '—'}</span></div>
+                        <div class="info-item"><span class="info-label">Ingresso</span><span class="info-value">${est.ano_ingresso}.${est.semestre_ingresso}</span></div>
+                        <div class="info-item"><span class="info-label">Situação</span><span class="info-value">${est.situacao}</span></div>
+                        <div class="info-item"><span class="info-label">CEP</span><span class="info-value">${est.cep || '—'}</span></div>
+                    </div>
+                </div>`;
+
+                // Indicadores acadêmicos
+                if (ult) {
+                    html += `
+                    <div class="section-card">
+                        <div class="section-title">📊 Indicadores Acadêmicos (Último Período)</div>
+                        <div class="info-grid">
+                            <div class="info-item"><span class="info-label">Média Global</span><span class="info-value">${formatarNumero(ult.media_global, 2)}</span></div>
+                            <div class="info-item"><span class="info-label">Média Semestre</span><span class="info-value">${formatarNumero(ult.media_semestre, 2)}</span></div>
+                            <div class="info-item"><span class="info-label">Frequência</span><span class="info-value">${formatarNumero(ult.frequencia_media, 1)}%</span></div>
+                            <div class="info-item"><span class="info-label">Disciplinas Cursadas</span><span class="info-value">${ult.disciplinas_cursadas}</span></div>
+                            <div class="info-item"><span class="info-label">Aprovadas</span><span class="info-value">${ult.disciplinas_aprovadas}</span></div>
+                            <div class="info-item"><span class="info-label">Reprovações</span><span class="info-value">${ult.reprovacoes}</span></div>
+                            <div class="info-item"><span class="info-label">Reprov. Sucessivas</span><span class="info-value">${ult.reprovacoes_sucessivas}</span></div>
+                            <div class="info-item"><span class="info-label">% Integralização</span><span class="info-value">${formatarNumero(ult.percentual_integralizacao, 1)}%</span></div>
+                            <div class="info-item"><span class="info-label">Trancamentos</span><span class="info-value">${ult.trancamentos}</span></div>
+                            <div class="info-item"><span class="info-label">Distância</span><span class="info-value">${formatarNumero(ult.distancia_km, 1)} km (linha reta)</span></div>
+                            <div class="info-item"><span class="info-label">Z-Score</span><span class="info-value">${formatarNumero(ult.z_score, 2)}</span></div>
+                            <div class="info-item"><span class="info-label">Período Curricular</span><span class="info-value">P${ult.periodo_curricular || '?'}</span></div>
+                        </div>
+                    </div>`;
+                }
+
+                // Fatores de alerta
+                if (alertas.length > 0) {
+                    html += `
+                    <div class="section-card">
+                        <div class="section-title">⚠️ Fatores de Alerta</div>
+                        <div class="alerts-list">
+                            ${alertas.map(a => `
+                                <div class="alert-item">
+                                    <span class="alert-icon">⚠️</span>
+                                    <span>${a}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <p class="text-muted mt-sm" style="font-size:0.75rem">
+                            Estes são indicadores descritivos, não provas causais. A análise deve ser feita por um profissional.
+                        </p>
+                    </div>`;
+                }
+
+                // Acompanhamento administrativo
+                html += `
+                <div class="section-card">
+                    <div class="section-title">📋 Acompanhamento Administrativo</div>
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">Responsável</span><span class="info-value">${est.funcionario_responsavel || 'Não atribuído'}</span></div>
+                        <div class="info-item"><span class="info-label">Situação</span><span class="info-value"><span class="badge badge-neutro">${est.situacao_atendimento || 'pendente'}</span></span></div>
+                        <div class="info-item"><span class="info-label">Último Contato</span><span class="info-value">${est.ultimo_contato || 'Nunca'}</span></div>
+                        <div class="info-item"><span class="info-label">Prioridade</span><span class="info-value">${est.prioridade_manual || 0}</span></div>
+                    </div>
+                    ${est.observacao ? `<p class="mt-sm text-secondary" style="font-size:0.85rem"><strong>Observação:</strong> ${est.observacao}</p>` : ''}
+                    ${est.encaminhamento ? `<p class="mt-sm text-secondary" style="font-size:0.85rem"><strong>Encaminhamento:</strong> ${est.encaminhamento}</p>` : ''}
+                </div>`;
+
+                // Gráfico de evolução
+                html += `
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Evolução do Estudante</div>
+                            <div class="chart-subtitle">Média, frequência e probabilidade de risco ao longo dos semestres</div>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-wrapper" style="height:280px;">
+                        <canvas id="chart-evolucao-estudante"></canvas>
+                    </div>
+                </div>`;
+
+                // Disciplinas atuais
+                if (disciplinas.length > 0) {
+                    html += `
+                    <div class="section-card">
+                        <div class="section-title">📚 Disciplinas (Último Período)</div>
+                        <div style="overflow-x:auto">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Disciplina</th>
+                                        <th>C.H.</th>
+                                        <th>Nota</th>
+                                        <th>Frequência</th>
+                                        <th>Situação</th>
+                                        <th>Tentativa</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${disciplinas.map(d => `
+                                    <tr>
+                                        <td class="font-mono">${d.disciplina_codigo}</td>
+                                        <td>${d.disciplina_nome}</td>
+                                        <td>${d.carga_horaria}h</td>
+                                        <td>${formatarNumero(d.nota, 1)}</td>
+                                        <td>${formatarNumero(d.frequencia, 0)}%</td>
+                                        <td><span class="badge badge-${d.situacao === 'aprovado' ? 'ok' : d.situacao === 'trancado' ? 'neutro' : 'perigo'}">${d.situacao}</span></td>
+                                        <td>${d.numero_tentativa}ª</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                }
+
+                // Histórico (timeline)
+                if (historico.length > 0) {
+                    html += `
+                    <div class="section-card">
+                        <div class="section-title">📅 Histórico de Acompanhamentos</div>
+                        <div class="timeline">
+                            ${historico.slice().reverse().map(h => {
+                                const rc = classeRisco(h.classificacao_risco);
+                                return `
+                                <div class="timeline-item risk-${rc}">
+                                    <div class="timeline-period">${h.periodo_letivo || h.ano + '.' + h.semestre} — P${h.periodo_curricular || '?'}</div>
+                                    <div class="timeline-content">
+                                        Média: ${formatarNumero(h.media_global, 1)} · 
+                                        Freq: ${formatarNumero(h.frequencia_media, 0)}% · 
+                                        Reprov: ${h.reprovacoes} · 
+                                        Integr: ${formatarNumero(h.percentual_integralizacao, 0)}% ·
+                                        <span class="badge badge-${rc}" style="font-size:0.7rem">
+                                            ${formatarProbabilidade(h.probabilidade_risco)} ${h.classificacao_risco || '—'}
+                                        </span>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>`;
+                }
+
+                document.getElementById('perfil-conteudo').innerHTML = html;
+
+                // Renderiza gráfico de evolução após inserir o HTML
+                if (evolucao && evolucao.periodos && evolucao.periodos.length > 0) {
+                    setTimeout(() => criarGraficoEvolucaoEstudante('chart-evolucao-estudante', evolucao), 100);
+                }
+
+            } catch (err) {
+                document.getElementById('perfil-conteudo').innerHTML = 
+                    `<p class="text-muted text-center" style="padding:48px">Erro ao carregar perfil: ${err.message}</p>`;
+                console.error(err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', carregarPerfil);
+    </script>
+</body>
+</html>
